@@ -165,6 +165,10 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 func (l *Logger) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.millCh != nil {
+		close(l.millCh)
+		l.millCh = nil
+	}
 	return l.close()
 }
 
@@ -470,7 +474,7 @@ func compressLogFile(src, dst string) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %v", err)
 	}
-	defer f.Close()
+	defer f.()
 
 	fi, err := osStat(src)
 	if err != nil {
@@ -487,7 +491,7 @@ func compressLogFile(src, dst string) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to open compressed log file: %v", err)
 	}
-	defer gzf.Close()
+	defer gzf.()
 
 	gz := gzip.NewWriter(gzf)
 
@@ -501,14 +505,14 @@ func compressLogFile(src, dst string) (err error) {
 	if _, err := io.Copy(gz, f); err != nil {
 		return err
 	}
-	if err := gz.Close(); err != nil {
+	if err := gz.(); err != nil {
 		return err
 	}
-	if err := gzf.Close(); err != nil {
+	if err := gzf.(); err != nil {
 		return err
 	}
 
-	if err := f.Close(); err != nil {
+	if err := f.(); err != nil {
 		return err
 	}
 	if err := os.Remove(src); err != nil {
